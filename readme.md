@@ -11,13 +11,13 @@ graph TD;
     LS[Llama-Server]-->V;
     WW[Wyoming-Whisper.cpp]-->V;
     V[Vulkan]-->GPU;
-    KW[wyoming-kokoro-torch]-->CPU;
+    KW[Wyoming-Kokoro-Torch]-->CPU;
 ```
 
 * *[Llama-Server](https://github.com/ggml-org/llama.cpp)* runs the LLM to generate responses and call tools.
-* *[Ollama-proxy](https://github.com/debackerl/ollama-proxy/)* exposes Llama-Server using the same API as Ollama. This is required because Home Assistant doesn't let users change the base URL of their OpenAPI or OpenRouter integrations. Only the Ollama integration lets you do it.
+* *[Ollama-proxy](https://github.com/debackerl/ollama-proxy/)* exposes Llama-Server using the same API as Ollama. This is required because Home Assistant doesn't let users change the base URL of their OpenAPI or OpenRouter integrations. Only the Ollama integration lets you do it. Ollama-proxy implements streaming, tools, and reasoning (however, I couldn't get Home Assistant to give back past reasoning traces yet). It doesn't support multi-modal (images) yet.
 * *[Wyoming-Whisper.cpp](https://github.com/debackerl/wyoming-whisper.cpp/)* implements ASR (Automatic Speech Recognition) using Whisper.cpp. Home Assistant offers Wyoming-Faster-Whisper already, but it doesn't run on Vulkan.
-* *[Kokoro-Wyoming-Torch](https://github.com/debackerl/wyoming-kokoro-torch)* It implements the TTS (Text-to-Speech) using Kokoro. It's fast enough to run on a CPU, but you can build your own Docker image to add CUDA or ROCm runtime.
+* *[Wyoming-Kokoro-Torch](https://github.com/debackerl/wyoming-kokoro-torch)* It implements the TTS (Text-to-Speech) using Kokoro. It's fast enough to run on a CPU, but you can build your own Docker image to add CUDA or ROCm runtime. As of the time of writing, contrary to [kokoro-wyoming](https://github.com/nordwestt/kokoro-wyoming), Wyoming-Kokoro-Torch supports streaming move, so that your voice assistant will start speaking before the LLM is fully done generating a response.
 
 Llama-Server and Wyoming-Whisper.cpp never run at the same time. The ASR always runs first obvisouly, and the whole decoded text will then be fed to the LLM. However, Llama-Server and Wyoming-Piper run concurrently, since the TTS will generate audio while the LLM is generating text.
 
@@ -43,9 +43,13 @@ The AMDVLK (user) driver is used since it's still a bit faster than RADV for pro
 
 ## Speed
 
+Measured in a Proxmox VM with iGPU passthrough:
+
 | System                | Model              | Prompt Processing (pp512) | Token Generation (tg128) |
 |-----------------------|--------------------|---------------------------|--------------------------|
 | AMD Ryzen AI 9 HX 370 | GPT OSS 20B (Q8_0) | 550                       | 25                       |
+
+You may also this [Llama.cpp Backend Performance Comparison](https://kyuz0.github.io/amd-strix-halo-toolboxes/) page, to see the "optimal" librairies to run each LLM on an AMD Ryzen AI MAX+ 395. Again, this is a moving target. The best solution could change over time as software is being optimized.
 
 ## Containers
 
@@ -58,7 +62,7 @@ Here is a list of all images, and their size.
 | debackerl/llama-server-vulkan     | b6432-amdvlk-2025.q2.1    | e327b4e19a86   | 443MB          |
 | debackerl/ollama-proxy            | be8a17e                   | 6b4581e24a1e   | 28.6MB         |
 | debackerl/wyoming-whisper.cpp     | v2.6.1-amdvlk-2025.q2.1   | c7e392c9cea2   | 541MB          |
-| debackerl/wyoming-kokoro-torch    | v3.0.0-cpu                | 14dfd64fe888   | 1.53GB         |
+| debackerl/wyoming-kokoro-torch    | v3.1.0-cpu                | 55d974f6baf2   | 1.53GB         |
 
 Example to create the containers:
 
@@ -69,8 +73,10 @@ docker create --name ollama-proxy -p 0.0.0.0:11434:11434 debackerl/ollama-proxy:
 
 docker create --name wyoming-whisper-cpp --device /dev/dri -p 0.0.0.0:10210:10000 -v /home/XXX/models:/models debackerl/wyoming-whisper.cpp:v2.6.1-amdvlk-2025.q2.1 /usr/local/bin/wyoming-whisper-cpp --uri tcp://0.0.0.0:10000 --model large-v3-turbo-q8_0 --data-dir /models --language en --beam-size 2
 
-docker create --name wyoming-kokoro-torch -p 0.0.0.0:10500:10210 -v /home/XXX/models:/models debackerl/wyoming-kokoro-torch:v3.0.0-cpu /usr/local/bin/wyoming-kokoro-torch --streaming --uri tcp://0.0.0.0:10210 --voice af_sky --data-dir /models
+docker create --name wyoming-kokoro-torch -p 0.0.0.0:10500:10210 -v /home/XXX/models:/models debackerl/wyoming-kokoro-torch:v3.1.0-cpu /usr/local/bin/wyoming-kokoro-torch --debug --streaming --uri tcp://0.0.0.0:10210 --voice af_sky --data-dir /models
 ```
+
+*Tip*: if you love killer robots coming from the future speaking with an Austrian accent, you may love the `am_onyx` voice in kokoro.
 
 ## Models
 
@@ -85,6 +91,8 @@ Most of those containers will require models to be downloaded in the `/home/XXX/
 Auto-downloaded
 
 ### TTS for wyoming-kokoro-torch
+
+You need to download the following two files:
 
 - https://huggingface.co/hexgrad/Kokoro-82M/blob/main/kokoro-v1_0.pth
 - https://huggingface.co/hexgrad/Kokoro-82M/blob/main/config.json
