@@ -17,9 +17,9 @@ graph TD;
 * *[Llama-Server](https://github.com/ggml-org/llama.cpp)* runs the LLM to generate responses and call tools.
 * *[Ollama-proxy](https://github.com/debackerl/ollama-proxy/)* exposes Llama-Server using the same API as Ollama. This is required because Home Assistant doesn't let users change the base URL of their OpenAPI or OpenRouter integrations. Only the Ollama integration lets you do it. Ollama-proxy implements streaming, tools, and reasoning (however, I couldn't get Home Assistant to give back past reasoning traces yet). It doesn't support multi-modal (images) yet.
 * *[Wyoming-Whisper.cpp](https://github.com/debackerl/wyoming-whisper.cpp/)* implements ASR (Automatic Speech Recognition) using Whisper.cpp. Home Assistant offers Wyoming-Faster-Whisper already, but it doesn't run on Vulkan.
-* *[Wyoming-Kokoro-Torch](https://github.com/debackerl/wyoming-kokoro-torch)* It implements the TTS (Text-to-Speech) using Kokoro. It's fast enough to run on a CPU, but you can build your own Docker image to add CUDA or ROCm runtime. As of the time of writing, contrary to [kokoro-wyoming](https://github.com/nordwestt/kokoro-wyoming), Wyoming-Kokoro-Torch supports streaming move, so that your voice assistant will start speaking before the LLM is fully done generating a response.
+* *[Wyoming-Kokoro-Torch](https://github.com/debackerl/wyoming-kokoro-torch)* It implements the TTS (Text-to-Speech) using Kokoro. It's fast enough to run on a CPU, but you can build your own Docker image to add CUDA or ROCm runtime. As of the time of writing, contrary to [kokoro-wyoming](https://github.com/nordwestt/kokoro-wyoming), Wyoming-Kokoro-Torch supports streaming mode, so that your voice assistant will start speaking before the LLM is fully done generating a response.
 
-Llama-Server and Wyoming-Whisper.cpp never run at the same time. The ASR always runs first obvisouly, and the whole decoded text will then be fed to the LLM. However, Llama-Server and Wyoming-Piper run concurrently, since the TTS will generate audio while the LLM is generating text.
+Llama-Server and Wyoming-Whisper.cpp never run at the same time. The ASR always runs first obvisouly, and the whole decoded text will then be fed to the LLM. However, Llama-Server and Wyoming-Kokoro-Torch run concurrently, since the TTS will generate audio while the LLM is generating text.
 
 ## Why Vulkan?
 
